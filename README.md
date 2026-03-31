@@ -45,7 +45,7 @@ The app shows live CPU, GPU, RAM, VRAM, storage, motherboard, and fan telemetry 
 
 - Windows 10 or Windows 11
 - Microsoft WebView2 runtime
-- Node.js 20+
+- Node.js 22+
 - Python 3.11+
 - Rust stable with the MSVC toolchain
 - Visual Studio Build Tools for Windows desktop compilation
