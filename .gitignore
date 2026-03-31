@@ -1,0 +1,27 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+backend/build/
+backend/dist/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# Tauri / Rust
+frontend/src-tauri/target/
+frontend/src-tauri/gen/schemas/
+frontend/src-tauri/binaries/*.exe
+
+# Local release artifacts
+*.msi

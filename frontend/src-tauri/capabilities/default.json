@@ -1,0 +1,19 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "default desktop permissions",
+  "windows": ["pc-hardware-monitor-main"],
+  "permissions": [
+    "core:default",
+    "shell:allow-kill",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "binaries/pc-monitor-backend",
+          "sidecar": true
+        }
+      ]
+    }
+  ]
+}

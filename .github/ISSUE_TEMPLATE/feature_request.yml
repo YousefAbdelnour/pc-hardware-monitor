@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest an improvement for the monitor, installer, or developer workflow.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+      description: What need are you trying to solve?
+      placeholder: I want historical export so temperature spikes can be reviewed later.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the change you would like to see.
+      placeholder: Add a CSV export action for the recent telemetry history.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workaround or other approach you have considered.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context
+      description: Mockups, references, or constraints that would help shape the work.

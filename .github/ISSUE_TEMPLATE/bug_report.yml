@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible defect in the app or build workflow.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is broken?
+      placeholder: The dashboard disconnects after waking the PC from sleep.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps so the issue can be reproduced.
+      placeholder: |
+        1. Open the desktop app
+        2. Put the machine to sleep
+        3. Wake it up
+        4. Observe the dashboard state
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: The dashboard reconnects automatically.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include Windows version, CPU/GPU, and whether this happened in dev mode or the packaged app.
+      placeholder: Windows 11 24H2, Ryzen 7 7700X, RTX 4070 Ti, packaged NSIS build.
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Extra context
+      description: Logs, screenshots, or video links if available.
