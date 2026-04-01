@@ -78,7 +78,7 @@ jobs:
         run: powershell -ExecutionPolicy Bypass -File .\scripts\build-backend.ps1
 
       - name: Build and publish installer
-        uses: tauri-apps/tauri-action@v1
+        uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
