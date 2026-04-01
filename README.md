@@ -6,6 +6,10 @@ A Windows desktop hardware monitor built with Tauri, React, FastAPI, `psutil`, a
 
 The app shows live CPU, GPU, RAM, VRAM, storage, motherboard, and fan telemetry in a desktop dashboard, then packages the whole experience into a native installer so it can be shared without running commands manually.
 
+## Download
+
+Download the latest Windows installer from [GitHub Releases](https://github.com/YousefAbdelnour/pc-hardware-monitor/releases).
+
 ## Features
 
 - Live desktop dashboard with WebSocket updates
@@ -101,7 +105,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-installer.ps1
 Installer output:
 
 ```text
-frontend\src-tauri\target\release\bundle\nsis\PC Hardware Monitor_0.1.0_x64-setup.exe
+frontend\src-tauri\target\release\bundle\nsis\PC Hardware Monitor_<version>_x64-setup.exe
 ```
 
 ## Quality Checks
@@ -129,33 +133,25 @@ Recommended GitHub settings for this repo:
 - Require the `backend-quality`, `frontend-quality`, and `tauri-quality` checks to pass
 - Optionally require at least one approving review
 
-## Publish To GitHub
+## Create A Release
 
-1. Review the license files and adjust them if you want different permissions before making the repository public.
-2. Create a new empty GitHub repository.
-3. Initialize the local repo if needed:
+1. Merge the release-ready pull request into `main`.
+2. Keep the app version aligned in:
 
-   ```powershell
-   git init -b main
+   ```text
+   frontend/package.json
+   frontend/src-tauri/tauri.conf.json
+   frontend/src-tauri/Cargo.toml
    ```
 
-4. Commit the project:
+3. Create and push a version tag:
 
    ```powershell
-   git add .
-   git commit -m "Initial release"
+   git tag v0.1.0
+   git push origin v0.1.0
    ```
 
-5. Connect the remote and push:
-
-   ```powershell
-   git remote add origin https://github.com/<your-username>/<your-repo>.git
-   git push -u origin main
-   ```
-
-6. Create a GitHub Release and upload the NSIS installer from the path above.
-
-After the initial publish, switch to the pull-request workflow above instead of pushing directly to `main`.
+4. Wait for `.github/workflows/release.yml` to finish. It will build the Windows installer and publish the asset to GitHub Releases automatically.
 
 ## Licensing
 

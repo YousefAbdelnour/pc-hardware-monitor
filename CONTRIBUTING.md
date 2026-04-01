@@ -31,6 +31,13 @@ Set-Location ..
 - Wait for CI to pass before merging.
 - Prefer squash merges to keep history clean.
 
+## Releases
+
+- Keep the app version aligned in `frontend/package.json`, `frontend/src-tauri/tauri.conf.json`, and `frontend/src-tauri/Cargo.toml`.
+- Build the installer locally if you want a final smoke test before shipping.
+- Cut releases from `main` by pushing a version tag such as `v0.1.0`.
+- The `release.yml` workflow builds the Windows installer and publishes it to GitHub Releases automatically.
+
 ## Recommended GitHub Rules
 
 To keep the repository interview-ready and team-friendly, enable these rules on `main`:
