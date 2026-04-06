@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/YousefAbdelnour/pc-hardware-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/YousefAbdelnour/pc-hardware-monitor/actions/workflows/ci.yml)
 
-A Windows desktop hardware monitor built with Tauri, React, FastAPI, `psutil`, and LibreHardwareMonitor.
+A Windows desktop hardware monitor built with Tauri, React, FastAPI, `psutil`, and a bundled headless sensor reader.
 
 The app shows live CPU, GPU, RAM, VRAM, storage, motherboard, and fan telemetry in a desktop dashboard, then packages the whole experience into a native installer so it can be shared without running commands manually.
 
@@ -14,7 +14,7 @@ Download the latest Windows installer from [GitHub Releases](https://github.com/
 
 - Live desktop dashboard with WebSocket updates
 - CPU, GPU, RAM, VRAM, storage, motherboard, and fan telemetry
-- Fast fallback metrics from `psutil` while LibreHardwareMonitor warms up
+- Fast fallback metrics from `psutil` while the sensor reader warms up
 - Thermal alerts and short history graphs
 - Native Windows installer built with Tauri NSIS
 - Hidden helper-process startup with clean shutdown handling
@@ -24,7 +24,7 @@ Download the latest Windows installer from [GitHub Releases](https://github.com/
 - Frontend: React, Vite, Framer Motion, Lucide
 - Desktop shell: Tauri 2
 - Backend API: FastAPI + Uvicorn
-- Hardware data: `psutil` + LibreHardwareMonitor
+- Hardware data: `psutil` + a bundled headless sensor reader built on `LibreHardwareMonitorLib`
 - Packaging: PyInstaller + Tauri bundle
 
 ## Project Structure
@@ -40,8 +40,8 @@ Download the latest Windows installer from [GitHub Releases](https://github.com/
 
 ## How It Works
 
-1. The Tauri app starts a hidden LibreHardwareMonitor process and a packaged FastAPI backend.
-2. The backend combines quick system stats from `psutil` with richer sensor data from LibreHardwareMonitor.
+1. The Tauri app starts a hidden sensor-reader helper and a packaged FastAPI backend.
+2. The backend combines quick system stats from `psutil` with richer sensor data from the bundled reader.
 3. The React UI connects to `ws://127.0.0.1:8000/ws` and renders the live dashboard.
 4. During shutdown, the desktop app tears down the helper processes so nothing is left running in the background.
 
@@ -50,6 +50,7 @@ Download the latest Windows installer from [GitHub Releases](https://github.com/
 - Windows 10 or Windows 11
 - Microsoft WebView2 runtime
 - Node.js 22+
+- .NET 8 SDK
 - Python 3.11+
 - Rust stable with the MSVC toolchain
 - Visual Studio Build Tools for Windows desktop compilation
@@ -96,6 +97,12 @@ Build the packaged backend sidecar:
 powershell -ExecutionPolicy Bypass -File .\scripts\build-backend.ps1
 ```
 
+Build the packaged sensor reader:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build-sensor-reader.ps1
+```
+
 Build the installer:
 
 ```powershell
@@ -113,7 +120,9 @@ frontend\src-tauri\target\release\bundle\nsis\PC Hardware Monitor_<version>_x64-
 The repository is set up for pull-request validation. Every PR should pass:
 
 - Backend lint: `python -m ruff check backend`
-- Backend syntax validation: `python -m py_compile .\backend\main.py .\backend\hardware.py`
+- Backend syntax validation: `python -m py_compile .\backend\main.py .\backend\hardware.py .\backend\tests\test_hardware.py`
+- Backend tests: `python -m pytest .\backend\tests`
+- Sensor reader build: `powershell -ExecutionPolicy Bypass -File .\scripts\build-sensor-reader.ps1`
 - Frontend lint: `npm run lint`
 - Frontend production build: `npm run build`
 - Tauri desktop shell validation: `npm run tauri:check`
@@ -130,7 +139,7 @@ Recommended GitHub settings for this repo:
 
 - Protect `main`
 - Require a pull request before merging
-- Require the `backend-quality`, `frontend-quality`, and `tauri-quality` checks to pass
+- Require the `backend-quality`, `sensor-reader-quality`, `frontend-quality`, and `tauri-quality` checks to pass
 - Optionally require at least one approving review
 
 ## Create A Release
@@ -147,8 +156,8 @@ Recommended GitHub settings for this repo:
 3. Create and push a version tag:
 
    ```powershell
-   git tag v0.1.0
-   git push origin v0.1.0
+   git tag v1.0.0
+   git push origin v1.0.0
    ```
 
 4. Wait for `.github/workflows/release.yml` to finish. It will build the Windows installer and publish the asset to GitHub Releases automatically.
@@ -168,6 +177,6 @@ Important:
 
 ## Notes
 
-- This project is currently Windows-only because it depends on LibreHardwareMonitor and Tauri Windows packaging.
+- This project is currently Windows-only because it depends on a Windows sensor stack and Tauri Windows packaging.
 - The repo intentionally keeps generated binaries and build folders out of version control.
-- If LibreHardwareMonitor takes a moment to warm up, the UI still shows the fast `psutil` metrics first and fills in the richer sensor data as soon as it becomes available.
+- If the sensor reader takes a moment to warm up, the UI still shows the fast `psutil` metrics first and fills in the richer sensor data as soon as it becomes available.

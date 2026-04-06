@@ -23,5 +23,9 @@ frontend/src-tauri/target/
 frontend/src-tauri/gen/schemas/
 frontend/src-tauri/binaries/*.exe
 
+# Sensor reader
+sensor-reader/bin/
+sensor-reader/obj/
+
 # Local release artifacts
 *.msi

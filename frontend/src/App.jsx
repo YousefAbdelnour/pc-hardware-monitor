@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Cpu,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+const TEMP_UNIT = "\u00B0C";
 
 function polarToCartesian(cx, cy, r, angleDeg) {
   const angle = ((angleDeg - 90) * Math.PI) / 180;
@@ -65,6 +66,11 @@ function formatValue(value, suffix = "", digits = 0) {
   if (value == null) return "--";
   if (digits > 0) return `${Number(value).toFixed(digits)}${suffix}`;
   return `${Math.round(value)}${suffix}`;
+}
+
+function formatTemperature(value) {
+  if (value == null) return "--";
+  return `${Math.round(value)}${TEMP_UNIT}`;
 }
 
 function pushHistory(prev, value, maxLen = 120) {
@@ -305,7 +311,7 @@ function GaugeCard({ label, value, temp, icon: Icon, subtext, history }) {
         <div className="meta-box">
           <div className="meta-label">Temperature</div>
           <div className="meta-value" style={{ color: currentTempColor }}>
-            {temp == null ? "--" : `${Math.round(temp)}°C`}
+            {formatTemperature(temp)}
           </div>
           <div style={{ marginTop: 6, color: "rgba(255,255,255,0.5)", fontSize: 12 }}>
             {tempStatus(temp)}
@@ -376,7 +382,7 @@ function TempOnlyCard({ label, temp, icon: Icon, subtitle }) {
             lineHeight: 1,
           }}
         >
-          {temp == null ? "--" : `${Math.round(temp)}°C`}
+          {formatTemperature(temp)}
         </div>
         <div style={{ marginTop: 10, color: "rgba(255,255,255,0.55)", fontSize: 14 }}>
           {subtitle}
@@ -398,6 +404,30 @@ function Pill({ icon: Icon, label, value }) {
   );
 }
 
+function FanPill({ fans }) {
+  return (
+    <div className="pill fan-pill">
+      <div className="pill-label fan-pill-label">
+        <Fan size={14} />
+        Fans
+      </div>
+
+      {fans?.length ? (
+        <div className="fan-chip-list">
+          {fans.map((fan, index) => (
+            <div className="fan-chip" key={`${fan.name}-${fan.rpm}-${index}`}>
+              <span className="fan-chip-name">{fan.name}</span>
+              <span className="fan-chip-rpm">{formatValue(fan.rpm, " RPM")}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="pill-value fan-pill-empty">--</div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [metrics, setMetrics] = useState(null);
   const [connected, setConnected] = useState(false);
@@ -413,7 +443,7 @@ export default function App() {
     gpu: 0,
   });
 
-  const lhmConnected = Boolean(metrics?.telemetry?.lhm_connected);
+  const sensorConnected = Boolean(metrics?.telemetry?.sensor_connected);
 
   function dismissToast(id) {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
@@ -433,8 +463,6 @@ export default function App() {
     let retryTimer;
     let stopped = false;
 
-    // Reconnect quickly so the UI feels live even if the backend restarts
-    // during development or while the packaged app is warming up.
     function connect() {
       if (stopped) return;
 
@@ -446,13 +474,14 @@ export default function App() {
 
       socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        setMetrics(data);
-
-        setHistory((prev) => ({
-          cpu: pushHistory(prev.cpu, data.cpu?.usage ?? 0),
-          gpu: pushHistory(prev.gpu, data.gpu?.usage ?? 0),
-          ram: pushHistory(prev.ram, data.ram?.usage ?? 0),
-        }));
+        startTransition(() => {
+          setMetrics(data);
+          setHistory((prev) => ({
+            cpu: pushHistory(prev.cpu, data.cpu?.usage ?? 0),
+            gpu: pushHistory(prev.gpu, data.gpu?.usage ?? 0),
+            ram: pushHistory(prev.ram, data.ram?.usage ?? 0),
+          }));
+        });
       };
 
       socket.onerror = () => {
@@ -489,18 +518,14 @@ export default function App() {
 
     if (cpuTemp != null && cpuTemp >= 85 && now - lastAlertRef.current.cpu > alertCooldownMs) {
       lastAlertRef.current.cpu = now;
-      showToast("CPU running hot", `CPU temperature reached ${Math.round(cpuTemp)}°C.`);
+      showToast("CPU running hot", `CPU temperature reached ${formatTemperature(cpuTemp)}.`);
     }
 
     if (gpuTemp != null && gpuTemp >= 85 && now - lastAlertRef.current.gpu > alertCooldownMs) {
       lastAlertRef.current.gpu = now;
-      showToast("GPU running hot", `GPU temperature reached ${Math.round(gpuTemp)}°C.`);
+      showToast("GPU running hot", `GPU temperature reached ${formatTemperature(gpuTemp)}.`);
     }
   }, [metrics]);
-
-  const fanDisplay = metrics?.fans?.length
-    ? metrics.fans.map((fan) => `${fan.name}: ${fan.rpm} RPM`).join(" | ")
-    : "--";
 
   const avgLoad = metrics
     ? Math.round(
@@ -510,8 +535,6 @@ export default function App() {
 
   const gauges = metrics
     ? [
-        // The card definitions stay data-driven so the layout is easy to tweak
-        // without duplicating the same presentational component logic.
         {
           label: "CPU",
           value: metrics.cpu?.usage ?? 0,
@@ -587,15 +610,11 @@ export default function App() {
           </div>
 
           <div className="pills">
-            <Pill icon={Fan} label="Fans" value={fanDisplay} />
+            <FanPill fans={metrics?.fans ?? []} />
             <Pill icon={Gauge} label="System load" value={`${avgLoad}%`} />
             <Pill icon={Zap} label="CPU power" value={formatValue(metrics?.cpu?.power_w, " W", 1)} />
             <Pill icon={Cpu} label="CPU clock" value={formatValue(metrics?.cpu?.clock_mhz, " MHz")} />
-            <Pill
-              icon={Monitor}
-              label="GPU temp"
-              value={metrics?.gpu?.temp == null ? "--" : `${Math.round(metrics.gpu.temp)}°C`}
-            />
+            <Pill icon={Monitor} label="GPU temp" value={formatTemperature(metrics?.gpu?.temp)} />
             <Pill icon={HardDrive} label="Uptime" value={metrics?.system?.uptime ?? "--"} />
             <Pill
               icon={MemoryStick}
@@ -609,7 +628,7 @@ export default function App() {
             <Pill
               icon={Gauge}
               label="Connection"
-              value={connected ? (lhmConnected ? "Live" : "Partial") : "Offline"}
+              value={connected ? (sensorConnected ? "Live" : "Fallback") : "Offline"}
             />
           </div>
         </div>
@@ -636,7 +655,8 @@ export default function App() {
         </div>
 
         <div className="footer-note">
-          Live WebSocket mode enabled. Toast alerts trigger at 85°C for CPU and GPU. History graphs show the most recent 120 updates.
+          Live WebSocket mode enabled. Toast alerts trigger at 85{TEMP_UNIT} for CPU and GPU. History
+          graphs show the most recent 120 updates.
         </div>
       </div>
     </div>

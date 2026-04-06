@@ -40,7 +40,27 @@ jobs:
         run: python -m ruff check backend
 
       - name: Validate backend syntax
-        run: python -m py_compile backend/main.py backend/hardware.py
+        run: python -m py_compile backend/main.py backend/hardware.py backend/tests/test_hardware.py
+
+      - name: Run backend tests
+        run: python -m pytest backend/tests
+
+  sensor-reader-quality:
+    name: sensor-reader-quality
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build sensor reader
+        run: powershell -ExecutionPolicy Bypass -File .\scripts\build-sensor-reader.ps1
 
   frontend-quality:
     name: frontend-quality
@@ -57,6 +77,11 @@ jobs:
           node-version: "22"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
 
       - name: Install frontend dependencies
         working-directory: frontend
@@ -112,6 +137,9 @@ jobs:
 
       - name: Build backend sidecar
         run: powershell -ExecutionPolicy Bypass -File .\scripts\build-backend.ps1
+
+      - name: Build sensor reader
+        run: powershell -ExecutionPolicy Bypass -File .\scripts\build-sensor-reader.ps1
 
       - name: Validate Tauri shell
         working-directory: frontend

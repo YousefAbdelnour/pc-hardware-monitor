@@ -16,9 +16,8 @@ use std::{mem::size_of, ptr::null};
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
-const LHM_PORT: u16 = 8085;
-const LHM_EAGER_WAIT_TIMEOUT: Duration = Duration::from_millis(1500);
-const LHM_WARMUP_DELAY: Duration = Duration::from_millis(800);
+const SENSOR_READER_PORT: u16 = 8095;
+const SENSOR_READER_EAGER_WAIT_TIMEOUT: Duration = Duration::from_millis(3500);
 const PORT_POLL_INTERVAL: Duration = Duration::from_millis(250);
 const PORT_CONNECT_TIMEOUT: Duration = Duration::from_millis(150);
 
@@ -144,7 +143,7 @@ impl Drop for JobHandle {
 }
 
 struct AppProcesses {
-    lhm_launcher: Mutex<Option<Child>>,
+    sensor_reader: Mutex<Option<Child>>,
     backend: Mutex<Option<Child>>,
     #[cfg(windows)]
     job: Option<JobHandle>,
@@ -152,9 +151,9 @@ struct AppProcesses {
 
 impl Drop for AppProcesses {
     fn drop(&mut self) {
-        if let Some(mut lhm_launcher) = self.lhm_launcher.get_mut().unwrap().take() {
-            let _ = lhm_launcher.kill();
-            let _ = lhm_launcher.wait();
+        if let Some(mut sensor_reader) = self.sensor_reader.get_mut().unwrap().take() {
+            let _ = sensor_reader.kill();
+            let _ = sensor_reader.wait();
         }
 
         if let Some(mut backend) = self.backend.get_mut().unwrap().take() {
@@ -167,7 +166,7 @@ impl Drop for AppProcesses {
 impl AppProcesses {
     fn new() -> Self {
         Self {
-            lhm_launcher: Mutex::new(None),
+            sensor_reader: Mutex::new(None),
             backend: Mutex::new(None),
             #[cfg(windows)]
             job: JobHandle::create_kill_on_close().ok(),
@@ -179,33 +178,24 @@ fn first_existing_path(candidates: impl IntoIterator<Item = PathBuf>) -> Option<
     candidates.into_iter().find(|path| path.exists())
 }
 
-fn resolve_lhm_path(resource_dir: &Path) -> Option<PathBuf> {
+fn resolve_sensor_reader_path(resource_dir: &Path) -> Option<PathBuf> {
     let parent_dir = resource_dir.parent();
 
-    // Tauri uses slightly different layouts in development, release, and the
-    // installed bundle, so probe the common locations instead of assuming one.
     first_existing_path(
         [
-            Some(
-                resource_dir
-                    .join("LibreHardwareMonitor")
-                    .join("LibreHardwareMonitor.exe"),
-            ),
+            Some(resource_dir.join("sensor-reader").join("monitor-sensor-reader.exe")),
             Some(
                 resource_dir
                     .join("resources")
-                    .join("LibreHardwareMonitor")
-                    .join("LibreHardwareMonitor.exe"),
+                    .join("sensor-reader")
+                    .join("monitor-sensor-reader.exe"),
             ),
             parent_dir.map(|dir| {
                 dir.join("resources")
-                    .join("LibreHardwareMonitor")
-                    .join("LibreHardwareMonitor.exe")
+                    .join("sensor-reader")
+                    .join("monitor-sensor-reader.exe")
             }),
-            parent_dir.map(|dir| {
-                dir.join("LibreHardwareMonitor")
-                    .join("LibreHardwareMonitor.exe")
-            }),
+            parent_dir.map(|dir| dir.join("sensor-reader").join("monitor-sensor-reader.exe")),
         ]
         .into_iter()
         .flatten(),
@@ -252,40 +242,12 @@ fn spawn_process(
     command.spawn()
 }
 
-fn escape_powershell_single_quoted(value: &Path) -> String {
-    value.to_string_lossy().replace('\'', "''")
-}
-
-fn spawn_hidden_gui_process(executable: &Path, working_dir: &Path) -> io::Result<Child> {
-    // Launch LHM through a tiny hidden PowerShell parent so the WinForms
-    // window never flashes while still inheriting the job-object cleanup.
-    let script = format!(
-        "Start-Sleep -Milliseconds 1000; Start-Process -FilePath '{}' -WorkingDirectory '{}' -WindowStyle Hidden | Out-Null",
-        escape_powershell_single_quoted(executable),
-        escape_powershell_single_quoted(working_dir)
-    );
-    let mut command = Command::new("powershell.exe");
-    command.args([
-        "-NoProfile",
-        "-NonInteractive",
-        "-WindowStyle",
-        "Hidden",
-        "-Command",
-        &script,
-    ]);
-
-    #[cfg(windows)]
-    command.creation_flags(CREATE_NO_WINDOW);
-
-    command.spawn()
-}
-
 fn cleanup_processes(processes: &AppProcesses) {
     {
-        let mut lhm_launcher = processes.lhm_launcher.lock().unwrap();
-        if let Some(mut lhm_launcher) = lhm_launcher.take() {
-            let _ = lhm_launcher.kill();
-            let _ = lhm_launcher.wait();
+        let mut sensor_reader = processes.sensor_reader.lock().unwrap();
+        if let Some(mut sensor_reader) = sensor_reader.take() {
+            let _ = sensor_reader.kill();
+            let _ = sensor_reader.wait();
         }
     }
 
@@ -315,7 +277,7 @@ fn wait_for_port(port: u16, timeout: Duration) -> bool {
     let deadline = Instant::now() + timeout;
 
     // Probe briefly so the backend can start quickly, then let it handle the
-    // richer sensor data as soon as LibreHardwareMonitor is actually ready.
+    // richer sensor data as soon as the bundled sensor reader is ready.
     while Instant::now() < deadline {
         if TcpStream::connect_timeout(&address, PORT_CONNECT_TIMEOUT).is_ok() {
             return true;
@@ -333,41 +295,40 @@ pub fn run() {
         .manage(AppProcesses::new())
         .setup(|app| {
             let resource_dir = app.path().resource_dir()?;
-            let lhm_path = resolve_lhm_path(&resource_dir);
+            let sensor_reader_path = resolve_sensor_reader_path(&resource_dir);
             let backend_path = resolve_backend_path(&resource_dir);
             let processes = app.state::<AppProcesses>();
-            let mut lhm_ready = false;
+            let mut sensor_reader_ready = false;
 
-            if let Some(lhm_path) = lhm_path {
-                let lhm_working_dir = lhm_path.parent().unwrap_or(&resource_dir);
-                match spawn_hidden_gui_process(&lhm_path, lhm_working_dir) {
-                    Ok(lhm_launcher) => {
-                        assign_child_to_job(&processes, &lhm_launcher);
-                        lhm_ready = wait_for_port(LHM_PORT, LHM_EAGER_WAIT_TIMEOUT);
-                        *processes.lhm_launcher.lock().unwrap() = Some(lhm_launcher);
+            if let Some(sensor_reader_path) = sensor_reader_path {
+                let sensor_reader_working_dir = sensor_reader_path.parent().unwrap_or(&resource_dir);
+                match spawn_process(&sensor_reader_path, sensor_reader_working_dir, true) {
+                    Ok(sensor_reader_child) => {
+                        assign_child_to_job(&processes, &sensor_reader_child);
+                        sensor_reader_ready =
+                            wait_for_port(SENSOR_READER_PORT, SENSOR_READER_EAGER_WAIT_TIMEOUT);
+                        *processes.sensor_reader.lock().unwrap() = Some(sensor_reader_child);
 
-                        if lhm_ready {
-                            thread::sleep(LHM_WARMUP_DELAY);
-                        } else {
+                        if !sensor_reader_ready {
                             eprintln!(
-                                "LibreHardwareMonitor did not open port {} within {:?}",
-                                LHM_PORT, LHM_EAGER_WAIT_TIMEOUT
+                                "Monitor sensor reader did not open port {} within {:?}",
+                                SENSOR_READER_PORT, SENSOR_READER_EAGER_WAIT_TIMEOUT
                             );
                         }
                     }
                     Err(error) => {
                         eprintln!(
-                            "Failed to launch LibreHardwareMonitor from {:?}: {}",
-                            lhm_path, error
+                            "Failed to launch the monitor sensor reader from {:?}: {}",
+                            sensor_reader_path, error
                         );
                     }
                 }
             } else {
-                eprintln!("LibreHardwareMonitor.exe not found near {:?}", resource_dir);
+                eprintln!("monitor-sensor-reader.exe not found near {:?}", resource_dir);
             }
 
-            if !lhm_ready {
-                eprintln!("Continuing without confirmed LibreHardwareMonitor connectivity.");
+            if !sensor_reader_ready {
+                eprintln!("Continuing without confirmed monitor sensor reader connectivity.");
             }
 
             if let Some(backend_path) = backend_path {
