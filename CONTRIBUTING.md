@@ -13,7 +13,9 @@ Run these before opening a PR:
 ```powershell
 python -m pip install -r .\backend\requirements-dev.txt
 python -m ruff check .\backend
-python -m py_compile .\backend\main.py .\backend\hardware.py
+python -m py_compile .\backend\main.py .\backend\hardware.py .\backend\tests\test_hardware.py
+python -m pytest .\backend\tests
+powershell -ExecutionPolicy Bypass -File .\scripts\build-sensor-reader.ps1
 
 Set-Location .\frontend
 npm ci
@@ -35,7 +37,7 @@ Set-Location ..
 
 - Keep the app version aligned in `frontend/package.json`, `frontend/src-tauri/tauri.conf.json`, and `frontend/src-tauri/Cargo.toml`.
 - Build the installer locally if you want a final smoke test before shipping.
-- Cut releases from `main` by pushing a version tag such as `v0.1.0`.
+- Cut releases from `main` by pushing a version tag such as `v1.0.0`.
 - The `release.yml` workflow builds the Windows installer and publishes it to GitHub Releases automatically.
 
 ## Recommended GitHub Rules

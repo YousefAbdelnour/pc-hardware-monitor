@@ -13,6 +13,6 @@ You may not:
 
 This license does not grant any rights to the source code beyond what is explicitly stated in [LICENSE.md](./LICENSE.md).
 
-This license also does not limit any rights you may have under applicable third-party licenses for bundled third-party software. See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
+Official compiled releases may include third-party components inside the packaged app, including the custom sensor reader's dependencies. This license does not limit any rights you may have under those applicable third-party licenses. See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
 
 If you want broader usage rights, commercial permissions, or redistribution permission, that requires prior written permission from the copyright holder.
