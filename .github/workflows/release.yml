@@ -36,6 +36,11 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -76,6 +81,9 @@ jobs:
 
       - name: Build backend sidecar
         run: powershell -ExecutionPolicy Bypass -File .\scripts\build-backend.ps1
+
+      - name: Build sensor reader
+        run: powershell -ExecutionPolicy Bypass -File .\scripts\build-sensor-reader.ps1
 
       - name: Build and publish installer
         uses: tauri-apps/tauri-action@v0.6.2

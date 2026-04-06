@@ -1,8 +1,8 @@
 {
   "name": "pc-monitor-frontend",
   "private": true,
-  "version": "0.1.0",
-  "description": "Windows desktop hardware monitor built with Tauri, React, FastAPI, and LibreHardwareMonitor.",
+  "version": "1.0.0",
+  "description": "Windows desktop hardware monitor built with Tauri, React, FastAPI, and a bundled sensor reader.",
   "repository": {
     "type": "git",
     "url": "https://github.com/YousefAbdelnour/pc-hardware-monitor.git"
