@@ -14,4 +14,4 @@ You may not:
 
 This license does not grant any rights to the source code.
 
-Third-party components included with this app remain under their own licenses. See the files in this folder for additional notices.
+Third-party components included with this app, including the custom sensor reader's dependencies, remain under their own licenses. See THIRD-PARTY-NOTICES.txt and the upstream license files in this folder for additional notices.

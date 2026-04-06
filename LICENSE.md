@@ -16,6 +16,6 @@ Except where a separate written permission is given by the copyright holder or w
 
 All rights not expressly granted are reserved.
 
-This file applies to the original source code in this repository. Third-party components are licensed separately under their own terms. See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
+This file applies to the original source code in this repository, including the frontend, backend, desktop shell, and custom sensor-reader source. Third-party binaries, notice files, and licenses are covered separately under their own terms. See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
 
 Official compiled releases are covered separately by [BINARY-USE-LICENSE.md](./BINARY-USE-LICENSE.md).

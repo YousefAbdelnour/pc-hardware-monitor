@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/YousefAbdelnour/pc-hardware-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/YousefAbdelnour/pc-hardware-monitor/actions/workflows/ci.yml)
 
-A Windows desktop hardware monitor built with Tauri, React, FastAPI, `psutil`, and a bundled headless sensor reader.
+A Windows desktop hardware monitor built with Tauri, React, FastAPI, `psutil`, and a custom .NET sensor reader.
 
 The app shows live CPU, GPU, RAM, VRAM, storage, motherboard, and fan telemetry in a desktop dashboard, then packages the whole experience into a native installer so it can be shared without running commands manually.
 
@@ -16,6 +16,7 @@ Download the latest Windows installer from [GitHub Releases](https://github.com/
 - CPU, GPU, RAM, VRAM, storage, motherboard, and fan telemetry
 - Fast fallback metrics from `psutil` while the sensor reader warms up
 - Thermal alerts and short history graphs
+- Elevated startup for full low-level hardware telemetry access
 - Native Windows installer built with Tauri NSIS
 - Hidden helper-process startup with clean shutdown handling
 
@@ -24,7 +25,7 @@ Download the latest Windows installer from [GitHub Releases](https://github.com/
 - Frontend: React, Vite, Framer Motion, Lucide
 - Desktop shell: Tauri 2
 - Backend API: FastAPI + Uvicorn
-- Hardware data: `psutil` + a bundled headless sensor reader built on `LibreHardwareMonitorLib`
+- Hardware data: `psutil` + a custom .NET sensor reader
 - Packaging: PyInstaller + Tauri bundle
 
 ## Project Structure
@@ -35,12 +36,14 @@ Download the latest Windows installer from [GitHub Releases](https://github.com/
 |-- frontend/               # React UI and Tauri desktop shell
 |   |-- src/                # Dashboard UI
 |   `-- src-tauri/          # Native app wrapper, icons, resources, bundling config
+|-- licenses/               # Third-party license texts bundled with releases
+|-- sensor-reader/          # Custom .NET helper that exposes normalized hardware metrics
 `-- scripts/                # Helper scripts for release packaging
 ```
 
 ## How It Works
 
-1. The Tauri app starts a hidden sensor-reader helper and a packaged FastAPI backend.
+1. The Tauri app requests administrator access, starts the custom sensor-reader helper, and launches the packaged FastAPI backend.
 2. The backend combines quick system stats from `psutil` with richer sensor data from the bundled reader.
 3. The React UI connects to `ws://127.0.0.1:8000/ws` and renders the live dashboard.
 4. During shutdown, the desktop app tears down the helper processes so nothing is left running in the background.
@@ -49,6 +52,7 @@ Download the latest Windows installer from [GitHub Releases](https://github.com/
 
 - Windows 10 or Windows 11
 - Microsoft WebView2 runtime
+- Administrator approval at launch for full telemetry access
 - Node.js 22+
 - .NET 8 SDK
 - Python 3.11+
@@ -174,9 +178,11 @@ Important:
 
 - A public GitHub repository still lets other GitHub users view the code, and GitHub may allow platform-level forks for public repos.
 - If you want to completely prevent public source access, the repository must stay private and you should only publish releases/screenshots instead of the code.
+- The packaged app includes a custom sensor reader and bundled third-party dependencies. Their notice files are documented in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
 
 ## Notes
 
+- On first launch, Windows will show a UAC prompt because the app elevates before starting the low-level sensor reader.
 - This project is currently Windows-only because it depends on a Windows sensor stack and Tauri Windows packaging.
 - The repo intentionally keeps generated binaries and build folders out of version control.
 - If the sensor reader takes a moment to warm up, the UI still shows the fast `psutil` metrics first and fills in the richer sensor data as soon as it becomes available.
