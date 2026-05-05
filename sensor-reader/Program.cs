@@ -143,7 +143,7 @@ internal static class Program
 
 internal sealed class TelemetryReader : IDisposable
 {
-    private static readonly TimeSpan SnapshotCacheDuration = TimeSpan.FromMilliseconds(150);
+    private static readonly TimeSpan SnapshotCacheDuration = TimeSpan.FromMilliseconds(250);
 
     private readonly object syncLock = new object();
     private readonly Computer computer;
@@ -156,7 +156,6 @@ internal sealed class TelemetryReader : IDisposable
         {
             IsCpuEnabled = true,
             IsGpuEnabled = true,
-            IsMemoryEnabled = true,
             IsMotherboardEnabled = true,
             IsStorageEnabled = true,
         };
@@ -189,18 +188,25 @@ internal sealed class TelemetryReader : IDisposable
         var hardwareSnapshots = new List<HardwareSnapshot>();
         foreach (var hardware in computer.Hardware)
         {
-            SnapshotHardware(hardware, new List<string>(), hardwareSnapshots);
+            SnapshotHardware(hardware, hardwareSnapshots);
         }
 
         var cpuHardware = hardwareSnapshots.FirstOrDefault(hardware => hardware.Type == HardwareType.Cpu);
         var gpuHardware = SelectPrimaryGpu(hardwareSnapshots);
-        var boardSensors = hardwareSnapshots
-            .Where(hardware => IsBoardHardwareType(hardware.Type))
-            .SelectMany(hardware => hardware.Sensors)
-            .ToList();
-        var storageHardware = hardwareSnapshots
-            .Where(hardware => hardware.Type == HardwareType.Storage)
-            .ToList();
+        var boardSensors = new List<SensorSnapshot>();
+        var storageHardware = new List<HardwareSnapshot>();
+
+        foreach (var snapshot in hardwareSnapshots)
+        {
+            if (IsBoardHardwareType(snapshot.Type))
+            {
+                boardSensors.AddRange(snapshot.Sensors);
+            }
+            else if (snapshot.Type == HardwareType.Storage)
+            {
+                storageHardware.Add(snapshot);
+            }
+        }
 
         return new SensorMetricsPayload
         {
@@ -216,15 +222,10 @@ internal sealed class TelemetryReader : IDisposable
 
     private static void SnapshotHardware(
         IHardware hardware,
-        List<string> parentPath,
         List<HardwareSnapshot> snapshots
     )
     {
         hardware.Update();
-
-        var hardwareName = CleanText(hardware.Name);
-        var path = new List<string>(parentPath);
-        path.Add(hardwareName);
 
         var sensors = hardware.Sensors
             .Select(
@@ -233,7 +234,6 @@ internal sealed class TelemetryReader : IDisposable
                     Type = sensor.SensorType,
                     Name = CleanText(sensor.Name),
                     Value = sensor.Value,
-                    Path = new List<string>(path),
                 }
             )
             .ToList();
@@ -242,15 +242,13 @@ internal sealed class TelemetryReader : IDisposable
             new HardwareSnapshot
             {
                 Type = hardware.HardwareType,
-                Name = hardwareName,
-                Path = path,
                 Sensors = sensors,
             }
         );
 
         foreach (var subHardware in hardware.SubHardware)
         {
-            SnapshotHardware(subHardware, path, snapshots);
+            SnapshotHardware(subHardware, snapshots);
         }
     }
 
@@ -264,32 +262,38 @@ internal sealed class TelemetryReader : IDisposable
                 new[] { "CPU Total" },
                 delegate(SensorSnapshot sensor) { return ContainsAny(sensor.Name, "cpu total", "total"); }
             ),
-            temp = PreferredValue(
-                hardware.Sensors,
-                SensorType.Temperature,
-                new[] { "Core (Tctl/Tdie)", "CPU Package", "Package" },
-                delegate(SensorSnapshot sensor)
-                {
-                    return ContainsAny(sensor.Name, "tctl", "tdie", "package");
-                }
+            temp = PositiveCpuValue(
+                PreferredValue(
+                    hardware.Sensors,
+                    SensorType.Temperature,
+                    new[] { "Core (Tctl/Tdie)", "CPU Package", "Package" },
+                    delegate(SensorSnapshot sensor)
+                    {
+                        return ContainsAny(sensor.Name, "tctl", "tdie", "package");
+                    }
+                )
             ),
-            clock_mhz = PreferredValue(
-                hardware.Sensors,
-                SensorType.Clock,
-                new[] { "Cores (Average)" },
-                delegate(SensorSnapshot sensor)
-                {
-                    return ContainsAny(sensor.Name, "average") && !ContainsAny(sensor.Name, "effective");
-                }
+            clock_mhz = PositiveCpuValue(
+                PreferredValue(
+                    hardware.Sensors,
+                    SensorType.Clock,
+                    new[] { "Cores (Average)" },
+                    delegate(SensorSnapshot sensor)
+                    {
+                        return ContainsAny(sensor.Name, "average") && !ContainsAny(sensor.Name, "effective");
+                    }
+                )
             ),
-            power_w = PreferredValue(
-                hardware.Sensors,
-                SensorType.Power,
-                new[] { "Package", "CPU Package", "Total" },
-                delegate(SensorSnapshot sensor)
-                {
-                    return ContainsAny(sensor.Name, "package", "cpu package");
-                }
+            power_w = PositiveCpuValue(
+                PreferredValue(
+                    hardware.Sensors,
+                    SensorType.Power,
+                    new[] { "Package", "CPU Package", "Total" },
+                    delegate(SensorSnapshot sensor)
+                    {
+                        return ContainsAny(sensor.Name, "package", "cpu package");
+                    }
+                )
             ),
         };
     }
@@ -402,21 +406,39 @@ internal sealed class TelemetryReader : IDisposable
 
     private static List<FanReading> ReadFans(List<HardwareSnapshot> hardware)
     {
-        return hardware
-            .Where(item => IsBoardHardwareType(item.Type) || IsGpuHardwareType(item.Type))
-            .SelectMany(
-                item => item.Sensors
-                    .Where(sensor => sensor.Type == SensorType.Fan && sensor.Value.HasValue && sensor.Value > 0)
-                    .Select(
-                        sensor => new FanReading
-                        {
-                            name = FormatFanName(item.Type, sensor.Name),
-                            rpm = (int)Math.Round(sensor.Value.Value, MidpointRounding.AwayFromZero),
-                        }
-                    )
-            )
-            .OrderBy(fan => fan.name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var readings = new List<FanReading>();
+
+        foreach (var item in hardware)
+        {
+            if (!IsBoardHardwareType(item.Type) && !IsGpuHardwareType(item.Type))
+            {
+                continue;
+            }
+
+            foreach (var sensor in item.Sensors)
+            {
+                if (sensor.Type != SensorType.Fan || !sensor.Value.HasValue || sensor.Value <= 0)
+                {
+                    continue;
+                }
+
+                readings.Add(
+                    new FanReading
+                    {
+                        name = FormatFanName(item.Type, sensor.Name),
+                        rpm = (int)Math.Round(sensor.Value.Value, MidpointRounding.AwayFromZero),
+                    }
+                );
+            }
+        }
+
+        readings.Sort(
+            delegate(FanReading left, FanReading right)
+            {
+                return StringComparer.OrdinalIgnoreCase.Compare(left.name, right.name);
+            }
+        );
+        return readings;
     }
 
     private static HardwareSnapshot SelectPrimaryGpu(List<HardwareSnapshot> hardware)
@@ -467,6 +489,13 @@ internal sealed class TelemetryReader : IDisposable
         }
 
         return 0;
+    }
+
+    private static float? PositiveCpuValue(float? value)
+    {
+        return value.HasValue && value.Value > 0
+            ? value
+            : (float?)null;
     }
 
     private static float? PreferredValue(
@@ -620,8 +649,6 @@ internal sealed class ErrorPayload
 internal sealed class HardwareSnapshot
 {
     public HardwareType Type;
-    public string Name;
-    public List<string> Path;
     public List<SensorSnapshot> Sensors;
 }
 
@@ -630,5 +657,4 @@ internal sealed class SensorSnapshot
     public SensorType Type;
     public string Name;
     public float? Value;
-    public List<string> Path;
 }

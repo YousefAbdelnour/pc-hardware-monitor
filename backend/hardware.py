@@ -8,11 +8,14 @@ import requests
 
 BOOT_TIME = datetime.fromtimestamp(psutil.boot_time())
 SENSOR_READER_URL = "http://127.0.0.1:8095/metrics"
-SENSOR_READER_TIMEOUT = (0.1, 0.25)
+SENSOR_READER_TIMEOUT = (0.05, 0.12)
 SENSOR_READER_CACHE_TTL_SECONDS = 5.0
+METRICS_CACHE_TTL_SECONDS = 0.25
 SENSOR_READER_SESSION = requests.Session()
 LAST_SENSOR_DATA = None
 LAST_SENSOR_SUCCESS_AT = 0.0
+LAST_METRICS_DATA = None
+LAST_METRICS_AT = 0.0
 
 # Prime psutil so subsequent cpu_percent calls are instantaneous.
 psutil.cpu_percent(interval=None)
@@ -36,6 +39,26 @@ def coerce_float(value):
         except ValueError:
             return None
     return None
+
+
+def positive_float(value):
+    numeric = coerce_float(value)
+    if numeric is None or numeric <= 0:
+        return None
+    return numeric
+
+
+def read_cpu_clock_mhz() -> float | None:
+    try:
+        frequency = psutil.cpu_freq()
+    except Exception:
+        return None
+
+    if frequency is None:
+        return None
+
+    current = positive_float(getattr(frequency, "current", None))
+    return round(current, 1) if current is not None else None
 
 
 def read_sensor_metrics() -> dict | None:
@@ -95,14 +118,13 @@ def overlay_section(base: dict, reader: dict, keys: tuple[str, ...]):
 def get_psutil_metrics() -> dict:
     vm = psutil.virtual_memory()
     du = psutil.disk_usage("C:/")
-    net = psutil.net_io_counters()
     uptime = str(datetime.now() - BOOT_TIME).split(".")[0]
 
     return {
         "cpu": {
             "usage": round(psutil.cpu_percent(interval=None), 1),
             "temp": None,
-            "clock_mhz": None,
+            "clock_mhz": read_cpu_clock_mhz(),
             "power_w": None,
         },
         "gpu": {
@@ -125,10 +147,6 @@ def get_psutil_metrics() -> dict:
             "used_gb": bytes_to_gb(du.used),
             "total_gb": bytes_to_gb(du.total),
         },
-        "network": {
-            "bytes_sent": net.bytes_sent,
-            "bytes_recv": net.bytes_recv,
-        },
         "system": {
             "uptime": uptime,
         },
@@ -149,7 +167,8 @@ def merge_sensor_metrics(base: dict, reader_data: dict | None) -> dict:
     if not isinstance(reader_data, dict):
         return base
 
-    overlay_section(base["cpu"], reader_data.get("cpu"), ("usage", "temp", "clock_mhz", "power_w"))
+    overlay_section(base["cpu"], reader_data.get("cpu"), ("usage",))
+    overlay_positive_fields(base["cpu"], reader_data.get("cpu"), ("temp", "clock_mhz", "power_w"))
     overlay_section(
         base["gpu"],
         reader_data.get("gpu"),
@@ -165,6 +184,23 @@ def merge_sensor_metrics(base: dict, reader_data: dict | None) -> dict:
     return base
 
 
+def overlay_positive_fields(base: dict, reader: dict, keys: tuple[str, ...]):
+    if not isinstance(reader, dict):
+        return
+
+    for key in keys:
+        value = positive_float(reader.get(key))
+        if value is not None:
+            base[key] = round(value, 1)
+
+
 def get_all_metrics() -> dict:
-    base = get_psutil_metrics()
-    return merge_sensor_metrics(base, read_sensor_metrics())
+    global LAST_METRICS_DATA, LAST_METRICS_AT
+
+    now = time.monotonic()
+    if LAST_METRICS_DATA is not None and now - LAST_METRICS_AT <= METRICS_CACHE_TTL_SECONDS:
+        return LAST_METRICS_DATA
+
+    LAST_METRICS_DATA = merge_sensor_metrics(get_psutil_metrics(), read_sensor_metrics())
+    LAST_METRICS_AT = now
+    return LAST_METRICS_DATA

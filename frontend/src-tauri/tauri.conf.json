@@ -16,6 +16,7 @@
         "title": "PC Hardware Monitor",
         "width": 1400,
         "height": 900,
+        "visible": false,
         "dataDirectory": "webview",
         "resizable": true,
         "fullscreen": false
@@ -39,7 +40,8 @@
       "binaries/pc-monitor-backend"
     ],
     "resources": [
-      "resources/**/*"
+      "resources/licenses/**/*",
+      "resources/sensor-runtime/**/*"
     ]
   }
 }
