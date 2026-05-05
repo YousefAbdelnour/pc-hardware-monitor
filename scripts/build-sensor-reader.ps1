@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $projectPath = Join-Path $repoRoot "sensor-reader\Monitor.SensorReader.csproj"
-$outputDir = Join-Path $repoRoot "frontend\src-tauri\resources\sensor-reader"
+$outputDir = Join-Path $repoRoot "frontend\src-tauri\resources\sensor-runtime"
 $localDotnet = Join-Path $env:USERPROFILE ".dotnet\dotnet.exe"
 
 function Test-DotnetSdk {
