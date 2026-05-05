@@ -160,8 +160,8 @@ Recommended GitHub settings for this repo:
 3. Create and push a version tag:
 
    ```powershell
-   git tag v1.0.0
-   git push origin v1.0.0
+   git tag v1.1.0
+   git push origin v1.1.0
    ```
 
 4. Wait for `.github/workflows/release.yml` to finish. It will build the Windows installer and publish the asset to GitHub Releases automatically.

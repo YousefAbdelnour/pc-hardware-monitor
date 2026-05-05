@@ -1232,7 +1232,7 @@ function UpdateCenterPanel({ appVersion, updateCenter, onCheckForUpdates, onOpen
       </div>
 
       <div className="diagnostic-list">
-        <DiagnosticsRow label="Current app version" value={appVersion ?? "1.0.0"} tone="good" />
+        <DiagnosticsRow label="Current app version" value={appVersion ?? "1.1.0"} tone="good" />
         <DiagnosticsRow label="Latest published version" value={updateCenter.latestVersion ?? "Unknown"} tone={tone} />
         <DiagnosticsRow
           label="Last checked"
@@ -1429,7 +1429,7 @@ function SidebarRail({
         <div className={`sidebar-status sidebar-status-${connectionLabel.toLowerCase()}`} title={connectionLabel}>
           {collapsed ? <span className="sidebar-status-dot" /> : connectionLabel}
         </div>
-        {!collapsed ? <div className="sidebar-version">v{appVersion ?? "1.0.0"}</div> : null}
+        {!collapsed ? <div className="sidebar-version">v{appVersion ?? "1.1.0"}</div> : null}
       </div>
     </motion.aside>
   );
@@ -1515,7 +1515,7 @@ export default function App() {
   const [settingsStatus, setSettingsStatus] = useState({ kind: "idle", message: "Ready." });
   const [diagnostics, setDiagnostics] = useState(null);
   const [lastSocketError, setLastSocketError] = useState(null);
-  const [appVersion, setAppVersion] = useState("1.0.0");
+  const [appVersion, setAppVersion] = useState("1.1.0");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeScreen, setActiveScreen] = useState(SCREEN_OVERVIEW);
   const [isPageVisible, setIsPageVisible] = useState(() =>
